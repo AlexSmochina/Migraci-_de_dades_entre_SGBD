@@ -51,3 +51,10 @@ class Asignaturas {
         return "COD = $cod ; NOMBRE = $nombre"
     }
 }
+
+fun main() {
+
+    val url = "mongodb+srv://AleSmoUser:AleSmoPassword@migracio-sgbd.oovaypo.mongodb.net/?retryWrites=true&w=majority&appName=Migracio-SGBD"
+
+
+}
