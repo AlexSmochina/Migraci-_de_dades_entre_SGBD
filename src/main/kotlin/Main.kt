@@ -1,3 +1,6 @@
+import com.mongodb.client.MongoClients
+import com.mongodb.client.MongoCollection
+import org.bson.Document
 
 // Alumnos
 class Alumno{
@@ -54,7 +57,10 @@ class Asignaturas {
 
 fun main() {
 
-    val url = "mongodb+srv://AleSmoUser:AleSmoPassword@migracio-sgbd.oovaypo.mongodb.net/?retryWrites=true&w=majority&appName=Migracio-SGBD"
+    val uri = "mongodb+srv://AleSmoUser:AleSmoPassword@migracio-sgbd.oovaypo.mongodb.net/?retryWrites=true&w=majority&appName=Migracio-SGBD"
+    val mongoClient = MongoClients.create(uri)
 
+    val dataBase = mongoClient.getDatabase("Alexandru_Lea_DataBase")
 
+    val collecion: MongoCollection<Document> = dataBase.getCollection("grades")
 }
