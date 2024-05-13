@@ -60,7 +60,9 @@ fun main() {
     val uri = "mongodb+srv://AleSmoUser:AleSmoPassword@migracio-sgbd.oovaypo.mongodb.net/?retryWrites=true&w=majority&appName=Migracio-SGBD"
     val mongoClient = MongoClients.create(uri)
 
-    val dataBase = mongoClient.getDatabase("Alexandru_Lea_DataBase")
+    val dataBase = mongoClient.getDatabase("Migracio-SGBD")
 
-    val collecion: MongoCollection<Document> = dataBase.getCollection("grades")
+    val collecion: MongoCollection<Document> = dataBase.getCollection("SGBD")
+
+
 }
