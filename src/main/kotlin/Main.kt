@@ -1,6 +1,9 @@
 import com.mongodb.client.MongoClients
 import com.mongodb.client.MongoCollection
 import org.bson.Document
+import java.sql.Connection
+import java.sql.DriverManager
+import kotlin.concurrent.timer
 
 // Alumnos
 class Alumno{
@@ -55,21 +58,20 @@ class Asignaturas {
     }
 }
 
-fun main() {
-
-    val uri = "mongodb+srv://AleSmoUser:AleSmoPassword@migracio-sgbd.oovaypo.mongodb.net/?retryWrites=true&w=majority&appName=Migracio-SGBD"
-    val mongoClient = MongoClients.create(uri)
-
-    val dataBase = mongoClient.getDatabase("Migracio-SGBD")
-
-    val collecion: MongoCollection<Document> = dataBase.getCollection("SGBD")
-}
-
 // COMPONENTES
 
 class Potgres {
+    private val baseDatos = ""
+    private var connection: Connection? = null
 
-    fun connexioBD(ost: String, usuari: String, password: String, bd: String){
+    fun connexioBD(host: String, usuari: String? = null, password: String? = null, bd: String){
+
+        val url = "jdbc:postgresql://${host}/${bd}"
+        if (usuari == null){
+            this.connection = DriverManager.getConnection(url)
+        } else {
+            this.connection = DriverManager.getConnection(url, usuari, password)
+        }
 
     }
 
@@ -91,11 +93,45 @@ class Potgres {
 }
 
 class Mongo {
+    private var collection: MongoCollection<Document>? = null
 
-    fun connexioBD(host: String,
-                   usuari: String,
-                   password: String,
-                   bd: String){
+    fun connexioMongoDb(host: String, usuari: String, password: String, bd: String){
+        val url = "mongodb+srv://${usuari}:${password}@${host}/?retryWrites=true&w=majority&appName=${bd}"
+        val mongoClient = MongoClients.create(url)
+        val database = mongoClient.getDatabase(bd)
+        collection = database.getCollection("SGBD")
+    }
 
+
+    fun <Generic> insereix(colleccio: String, objecte: Generic){
+        val document = Document()
+
+        collection?.insertOne(document)
     }
 }
+
+// Usuatio/cliente  ue utiliza los componentes
+//Desenvolupeu una aplicació que fent ús dels components implementats satisfaga l’objectiu d’aquesta pràctica.
+// Migrar les dades de la BD school en el SGBD PostgreSQL (pràctica de l’UF2 del mòdul) a equivalent BD en l’entorn del SGBD MongoDB.
+fun main() {
+
+    //Connexion Postgres
+    val potgres = Potgres()
+    val host = "localhost:5432"
+    val bd = "school"
+    val connexioBd = potgres.connexioBD(host = host, bd = bd)
+
+
+
+    //Connexion Mongo
+    val mongo = Mongo()
+    val hostMongo = "migracio-sgbd.oovaypo.mongodb.net"
+    val bdMongo = "Migracio-SGBD"
+    val user = "AleSmoUser"
+    val password = "AleSmoPassword"
+    val connexioMongo = mongo.connexioMongoDb(hostMongo,user,password,bdMongo)
+
+
+
+}
+
