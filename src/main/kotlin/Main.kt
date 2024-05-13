@@ -63,6 +63,39 @@ fun main() {
     val dataBase = mongoClient.getDatabase("Migracio-SGBD")
 
     val collecion: MongoCollection<Document> = dataBase.getCollection("SGBD")
+}
 
+// COMPONENTES
 
+class Potgres {
+
+    fun connexioBD(ost: String, usuari: String, password: String, bd: String){
+
+    }
+
+    fun llegeix(taula: String){
+
+    }
+
+    fun hiha(taula: String){
+
+    }
+
+    fun recupera(taula: String){
+
+    }
+
+    fun desconnexio(taula: String){
+
+    }
+}
+
+class Mongo {
+
+    fun connexioBD(host: String,
+                   usuari: String,
+                   password: String,
+                   bd: String){
+
+    }
 }
