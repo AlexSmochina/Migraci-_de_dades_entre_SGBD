@@ -3,66 +3,24 @@ import com.mongodb.client.MongoCollection
 import org.bson.Document
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.ResultSet
 import kotlin.concurrent.timer
 
 // Alumnos
-class Alumno{
-    val dni: String
-    val apenom: String
-    val direc: String
-    val pobla: String
-    val telef: String
-
-    constructor( dni: String, apenom: String, direc: String, pobla: String, telef: String){
-        this.dni = dni
-        this.apenom = apenom
-        this.direc = direc
-        this.pobla = pobla
-        this.telef = telef
-    }
-
-    override fun toString(): String {
-        return "DNI = $dni ; APENOM = $apenom ; DIREC = $apenom ; DIREC = $direc ; POBLA = $pobla ; TELEF = $telef"
-    }
-}
+data class Alumno (val dni: String, val apenom: String, val direc: String, val pobla: String, val telef: String)
 
 // Notas
-class Nota{
-    val dni: String
-    val cod: Int
-    val nota: Int
-
-    constructor( dni: String,cod: Int, nota: Int ) {
-        this.dni = dni
-        this.cod = cod
-        this.nota = nota
-    }
-
-    override fun toString(): String {
-        return "DNI = $dni ; COD = $cod ; NOTA = $nota"
-    }
-}
+data class Nota (val dni: String, val cod: Int, val nota: Int)
 
 // Asignaturas
-class Asignaturas {
-    val cod: Int
-    val nombre: String
-
-    constructor(cod: Int, nombre: String) {
-        this.cod = cod
-        this.nombre = nombre
-    }
-
-    override fun toString(): String {
-        return "COD = $cod ; NOMBRE = $nombre"
-    }
-}
+data class Asignatura (val cod: Int, val nombre: String)
 
 // COMPONENTES
 
 class Potgres {
     private val baseDatos = ""
     private var connection: Connection? = null
+    private val resultSet = mutableMapOf<String,ResultSet>()
 
     fun connexioBD(host: String, usuari: String? = null, password: String? = null, bd: String){
 
@@ -76,19 +34,53 @@ class Potgres {
     }
 
     fun llegeix(taula: String){
+        val query = connection?.createStatement() ?: throw Exception("La conneccion no existe")
+        val result = query.executeQuery("SELECT * FROM $taula")
 
+        resultSet[taula] = result
     }
 
-    fun hiha(taula: String){
+    fun hiha(taula: String): Boolean {
+        val boolean = resultSet[taula]?.next() ?: false
 
+        return boolean
     }
 
-    fun recupera(taula: String){
+    fun <Generic>recupera(taula: String): Generic{
+        return  recuperar<Generic::>(taula)
+    }
 
+    private inline fun <reified Generic> recuperar(taula: String): Generic {
+        val rs = resultSet[taula]
+        val clazz:Class<Generic> = Generic::class.java
+
+        return when ( clazz ) {
+            Nota::class.java -> { recuperarNotas(rs!!) as Generic }
+            else -> { throw IllegalArgumentException("Tipo no soportado: ${Generic::class}") }
+        }
+    }
+
+
+    private fun recuperarNotas(rs: ResultSet): Nota {
+        val nota: Nota = Nota("",0,0)
+
+        return nota
+    }
+
+    private fun recuperarAlumno(rs: ResultSet): Alumno {
+        val alumno: Alumno
+
+        return alumno
+    }
+
+    private fun recuperarAsignatura(rs: ResultSet): Asignatura {
+        val asignatura: Asignatura
+
+        return asignatura
     }
 
     fun desconnexio(taula: String){
-
+        connection?.close() ?: throw Exception("La conneccion no existe")
     }
 }
 
@@ -119,9 +111,7 @@ fun main() {
     val potgres = Potgres()
     val host = "localhost:5432"
     val bd = "school"
-    val connexioBd = potgres.connexioBD(host = host, bd = bd)
-
-
+    potgres.connexioBD(host = host, bd = bd)
 
     //Connexion Mongo
     val mongo = Mongo()
@@ -129,9 +119,45 @@ fun main() {
     val bdMongo = "Migracio-SGBD"
     val user = "AleSmoUser"
     val password = "AleSmoPassword"
-    val connexioMongo = mongo.connexioMongoDb(hostMongo,user,password,bdMongo)
+    mongo.connexioMongoDb(hostMongo,user,password,bdMongo)
 
+    //Hacemos las migraciones de PostgreSQL a MongoDB
+    migrarAlumnos(potgres,mongo)
+    migrarNota(potgres,mongo)
+    migrarAsignaturas(potgres,mongo)
 
+}
 
+fun migrarAlumnos(postgres: Potgres, mongo: Mongo) {
+    // Recuperar datos de Alumno de PostgreSQL
+    postgres.llegeix("alumno")
+
+    // Insertar datos de Alumnos en MongoDB
+    while (postgres.hiha("alumno")) {
+        val alumno = postgres.recupera<Alumno>("alumno")
+        mongo.insereix("Alumnos", alumno)
+    }
+}
+
+fun migrarNota(postgres: Potgres, mongo: Mongo) {
+    // Recuperar datos de Nota de PostgreSQL
+    postgres.llegeix("nota")
+
+    // Insertar datos de Nota en MongoDB
+    while (postgres.hiha("nota")) {
+        val nota = postgres.recupera<Nota>("nota")
+        mongo.insereix("Notas", nota)
+    }
+}
+
+fun migrarAsignaturas(postgres: Potgres, mongo: Mongo) {
+    // Recuperar datos de Asignatura de PostgreSQL
+    postgres.llegeix("asignatura")
+
+    // Insertar datos de Asignatura en MongoDB
+    while (postgres.hiha("asignatura")) {
+        val asignatura = postgres.recupera<Asignatura>("asignatura")
+        mongo.insereix("Asignaturas", asignatura)
+    }
 }
 
