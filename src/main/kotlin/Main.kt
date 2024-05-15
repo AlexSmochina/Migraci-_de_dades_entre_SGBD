@@ -1,31 +1,33 @@
+import com.mongodb.client.MongoClient
 import com.mongodb.client.MongoClients
 import com.mongodb.client.MongoCollection
+import com.mongodb.client.MongoDatabase
 import org.bson.Document
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
-import kotlin.concurrent.timer
 
+//Base de datos
+interface School
 // Alumnos
-data class Alumno (val dni: String, val apenom: String, val direc: String, val pobla: String, val telef: String)
+data class Alumno(val dni: String, val apenom: String, val direc: String, val pobla: String, val telef: String): School
 
 // Notas
-data class Nota (val dni: String, val cod: Int, val nota: Int)
+data class Nota(val dni: String, val cod: Int, val nota: Int): School
 
 // Asignaturas
-data class Asignatura (val cod: Int, val nombre: String)
+data class Asignatura(val cod: Int, val nombre: String): School
 
 // COMPONENTES
 
 class Potgres {
-    private val baseDatos = ""
     private var connection: Connection? = null
-    private val resultSet = mutableMapOf<String,ResultSet>()
+    private val resultSet = mutableMapOf<String, ResultSet>()
 
-    fun connexioBD(host: String, usuari: String? = null, password: String? = null, bd: String){
+    fun connexioBD(host: String, usuari: String? = null, password: String? = null, bd: String) {
 
         val url = "jdbc:postgresql://${host}/${bd}"
-        if (usuari == null){
+        if (usuari == null) {
             this.connection = DriverManager.getConnection(url)
         } else {
             this.connection = DriverManager.getConnection(url, usuari, password)
@@ -33,7 +35,7 @@ class Potgres {
 
     }
 
-    fun llegeix(taula: String){
+    fun llegeix(taula: String) {
         val query = connection?.createStatement() ?: throw Exception("La conneccion no existe")
         val result = query.executeQuery("SELECT * FROM $taula")
 
@@ -46,60 +48,114 @@ class Potgres {
         return boolean
     }
 
-    fun <Generic>recupera(taula: String): Generic{
-        return  recuperar<Generic::>(taula)
-    }
+    fun recuperar(taula: String): School? {
+        val rs: ResultSet = resultSet[taula]!!
+        var respuesta :School? = null
 
-    private inline fun <reified Generic> recuperar(taula: String): Generic {
-        val rs = resultSet[taula]
-        val clazz:Class<Generic> = Generic::class.java
-
-        return when ( clazz ) {
-            Nota::class.java -> { recuperarNotas(rs!!) as Generic }
-            else -> { throw IllegalArgumentException("Tipo no soportado: ${Generic::class}") }
+        when(taula){
+            "asignaturas" -> {
+                respuesta = recuperarAsignatura(rs)
+            }
+            "alumnos" -> {
+                respuesta = recuperarAlumno(rs)
+            }
+            "notas" -> {
+                respuesta = recuperarNotas(rs)
+            }
         }
+        return respuesta
     }
 
-
-    private fun recuperarNotas(rs: ResultSet): Nota {
-        val nota: Nota = Nota("",0,0)
-
-        return nota
-    }
-
+    //metodos para pedir los datos de cada tabla
     private fun recuperarAlumno(rs: ResultSet): Alumno {
-        val alumno: Alumno
+        val alumno: Alumno = Alumno(
+            dni = rs.getString("dni"),
+            apenom = rs.getString("apenom"),
+            direc = rs.getString("direc"),
+            pobla = rs.getString("pobla"),
+            telef = rs.getString("telef")
+
+        )
 
         return alumno
     }
 
     private fun recuperarAsignatura(rs: ResultSet): Asignatura {
-        val asignatura: Asignatura
+        val asignatura: Asignatura = Asignatura(
+            cod = rs.getInt("cod"),
+            nombre = rs.getString("nombre")
+        )
 
         return asignatura
     }
 
-    fun desconnexio(taula: String){
+    private fun recuperarNotas(rs: ResultSet): Nota {
+        val nota: Nota = Nota(
+            dni = rs.getString("dni"),
+            cod = rs.getInt("cod"),
+            nota = rs.getInt("nota")
+        )
+
+        return nota
+    }
+
+    fun desconnexio() {
         connection?.close() ?: throw Exception("La conneccion no existe")
     }
 }
 
 class Mongo {
-    private var collection: MongoCollection<Document>? = null
+    private  var mongoClient: MongoClient? = null
+    private var database:  MongoDatabase? = null
 
-    fun connexioMongoDb(host: String, usuari: String, password: String, bd: String){
+    fun connexioMongoDb(host: String, usuari: String, password: String, bd: String) {
         val url = "mongodb+srv://${usuari}:${password}@${host}/?retryWrites=true&w=majority&appName=${bd}"
-        val mongoClient = MongoClients.create(url)
-        val database = mongoClient.getDatabase(bd)
-        collection = database.getCollection("SGBD")
+        mongoClient = MongoClients.create(url)
+        database = mongoClient!!.getDatabase(bd)
     }
 
 
-    fun <Generic> insereix(colleccio: String, objecte: Generic){
+    fun insereix(colleccio: String, objecte: School) {
         val document = Document()
+        val collection:  MongoCollection<Document>
 
-        collection?.insertOne(document)
+        if (database == null) {
+            throw Exception("No se ha creado la conneccion")
+        } else {
+            collection = database!!.getCollection(colleccio)
+        }
+
+        when (objecte) {
+            is Alumno -> {
+                document.append("dni", objecte.dni)
+                document.append("apenom", objecte.apenom)
+                document.append("direc", objecte.direc)
+                document.append("pobla", objecte.pobla)
+                document.append("telef", objecte.telef)
+            }
+            is Nota -> {
+                document.append("dni", objecte.dni)
+                document.append("cod", objecte.cod)
+                document.append("nota", objecte.nota)
+            }
+            is Asignatura -> {
+                document.append("cod", objecte.cod)
+                document.append("nombre", objecte.nombre)
+            }
+            else -> throw Exception("Tipo de objeto no soportado: ${objecte::class.simpleName}")
+        }
+
+        collection.insertOne(document)
     }
+
+    fun desconnexio() {
+        mongoClient?.close() ?: throw Exception("La conneccion no existe")
+
+        //reinicioalizamos los valores
+        mongoClient = null
+        database = null
+    }
+
 }
 
 // Usuatio/cliente  ue utiliza los componentes
@@ -119,45 +175,29 @@ fun main() {
     val bdMongo = "Migracio-SGBD"
     val user = "AleSmoUser"
     val password = "AleSmoPassword"
-    mongo.connexioMongoDb(hostMongo,user,password,bdMongo)
+    mongo.connexioMongoDb(hostMongo, user, password, bdMongo)
 
     //Hacemos las migraciones de PostgreSQL a MongoDB
-    migrarAlumnos(potgres,mongo)
-    migrarNota(potgres,mongo)
-    migrarAsignaturas(potgres,mongo)
+    migrar(potgres, mongo, "alumnos", "Alumnos" )
+    migrar(potgres, mongo, "notas", "Notas" )
+    migrar(potgres, mongo, "asignaturas", "Asignaturas" )
 
+    potgres.desconnexio()
+    mongo.desconnexio()
 }
 
-fun migrarAlumnos(postgres: Potgres, mongo: Mongo) {
+fun migrar(postgres: Potgres, mongo: Mongo, taulaPostgres: String, colleccioMongoDB: String) {
     // Recuperar datos de Alumno de PostgreSQL
-    postgres.llegeix("alumno")
+    postgres.llegeix(taulaPostgres)
 
-    // Insertar datos de Alumnos en MongoDB
-    while (postgres.hiha("alumno")) {
-        val alumno = postgres.recupera<Alumno>("alumno")
-        mongo.insereix("Alumnos", alumno)
-    }
-}
-
-fun migrarNota(postgres: Potgres, mongo: Mongo) {
-    // Recuperar datos de Nota de PostgreSQL
-    postgres.llegeix("nota")
-
-    // Insertar datos de Nota en MongoDB
-    while (postgres.hiha("nota")) {
-        val nota = postgres.recupera<Nota>("nota")
-        mongo.insereix("Notas", nota)
-    }
-}
-
-fun migrarAsignaturas(postgres: Potgres, mongo: Mongo) {
-    // Recuperar datos de Asignatura de PostgreSQL
-    postgres.llegeix("asignatura")
-
-    // Insertar datos de Asignatura en MongoDB
-    while (postgres.hiha("asignatura")) {
-        val asignatura = postgres.recupera<Asignatura>("asignatura")
-        mongo.insereix("Asignaturas", asignatura)
+    // Insertar datos de PostgreSQL en MongoDB
+    while (postgres.hiha(taulaPostgres)) {
+        val registro = postgres.recuperar(taulaPostgres)
+        if (registro != null) {
+            mongo.insereix(colleccioMongoDB, registro)
+        } else {
+            println("La tabla no existe")
+        }
     }
 }
 
